@@ -5,6 +5,7 @@ import static xonin.backhand.api.core.EnumHand.MAIN_HAND;
 import java.util.Objects;
 
 import net.minecraft.block.BlockDispenser;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.ai.attributes.IAttributeInstance;
 import net.minecraft.entity.player.EntityPlayer;
@@ -12,6 +13,7 @@ import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.item.EnumAction;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.DamageSource;
 import net.minecraft.util.RegistrySimple;
 import net.minecraft.world.World;
 import net.minecraftforge.common.ForgeHooks;
@@ -37,6 +39,7 @@ import xonin.backhand.hooks.containerfix.IContainerHook;
 import xonin.backhand.packet.BackhandPacketHandler;
 import xonin.backhand.packet.OffhandAnimationPacket;
 import xonin.backhand.packet.OffhandSyncOffhandUse;
+import xonin.backhand.utils.BackhandConfig;
 
 @Mixin(EntityPlayer.class)
 public abstract class MixinEntityPlayer extends EntityLivingBase implements IBackhandPlayer {
@@ -57,6 +60,12 @@ public abstract class MixinEntityPlayer extends EntityLivingBase implements IBac
     private boolean backhand$isOffhandItemInUs = false;
     @Unique
     private int backhand$mainhandSlot;
+    @Unique
+    private int backhand$lastAttackTargetId = -1;
+    @Unique
+    private int backhand$lastAttackTick = Integer.MIN_VALUE;
+    @Unique
+    private boolean backhand$lastAttackWasOffhand = false;
 
     private MixinEntityPlayer(World p_i1594_1_) {
         super(p_i1594_1_);
@@ -177,6 +186,34 @@ public abstract class MixinEntityPlayer extends EntityLivingBase implements IBac
         return original.call(instance);
     }
 
+    @WrapOperation(
+        method = "attackTargetEntityWithCurrentItem",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/entity/Entity;attackEntityFrom(Lnet/minecraft/util/DamageSource;F)Z"))
+    private boolean backhand$adjustDualWieldAttackIFrames(Entity targetEntity, DamageSource source, float amount,
+        Operation<Boolean> original) {
+        EntityPlayer player = (EntityPlayer) (Object) this;
+        boolean usingOffhand = BackhandUtils.isUsingOffhand(player);
+        boolean dualWieldCombo = backhand$isDualWieldCombo(targetEntity, usingOffhand);
+
+        if (dualWieldCombo) {
+            backhand$clampTargetIFrames(targetEntity);
+        }
+
+        boolean result = original.call(targetEntity, source, amount);
+        if (result) {
+            backhand$lastAttackTargetId = targetEntity.getEntityId();
+            backhand$lastAttackTick = ticksExisted;
+            backhand$lastAttackWasOffhand = usingOffhand;
+
+            if (dualWieldCombo) {
+                backhand$clampTargetIFrames(targetEntity);
+            }
+        }
+        return result;
+    }
+
     @Unique
     private void backhand$refreshAttributes(ItemStack oldItem, ItemStack newItem) {
         if (oldItem != null) {
@@ -185,6 +222,25 @@ public abstract class MixinEntityPlayer extends EntityLivingBase implements IBac
 
         if (newItem != null) {
             getAttributeMap().applyAttributeModifiers(newItem.getAttributeModifiers());
+        }
+    }
+
+    @Unique
+    private boolean backhand$isDualWieldCombo(Entity targetEntity, boolean usingOffhand) {
+        return BackhandConfig.DualWieldAttackIFrames < 20
+            && targetEntity instanceof EntityLivingBase
+            && !(targetEntity instanceof EntityPlayer)
+            && targetEntity.getEntityId() == backhand$lastAttackTargetId
+            && usingOffhand != backhand$lastAttackWasOffhand
+            && ticksExisted - backhand$lastAttackTick <= ((EntityLivingBase) targetEntity).maxHurtResistantTime;
+    }
+
+    @Unique
+    private void backhand$clampTargetIFrames(Entity targetEntity) {
+        if (!(targetEntity instanceof EntityLivingBase target)) return;
+        int comboIFrames = Math.max(0, BackhandConfig.DualWieldAttackIFrames);
+        if (target.hurtResistantTime > comboIFrames) {
+            target.hurtResistantTime = comboIFrames;
         }
     }
 
