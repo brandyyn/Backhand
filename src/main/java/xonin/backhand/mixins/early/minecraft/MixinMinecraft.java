@@ -13,6 +13,7 @@ import net.minecraft.client.multiplayer.PlayerControllerMP;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.particle.EffectRenderer;
 import net.minecraft.client.renderer.EntityRenderer;
+import net.minecraft.client.settings.GameSettings;
 import net.minecraft.item.ItemBucket;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.MovingObjectPosition;
@@ -68,8 +69,14 @@ public abstract class MixinMinecraft {
     @Shadow
     public EffectRenderer effectRenderer;
 
+    @Shadow
+    public GameSettings gameSettings;
+
     @Unique
     private int backhand$breakBlockTimer = 0;
+
+    @Unique
+    private boolean backhand$suppressNextOffhandBreakSwing = false;
 
     /**
      * @author Lyft
@@ -151,22 +158,24 @@ public abstract class MixinMinecraft {
             }
         }
 
-        if (BackhandConfig.OffhandAttack && objectMouseOver.typeOfHit == MovingObjectType.ENTITY
-            && offhandItem != null) {
+        if (BackhandConfig.OffhandBreakBlocks && blockHit && backhand$canBreakWithOffhand(mainHandItem, offhandItem)) {
             BackhandUtils.useOffhandItem(thePlayer, () -> {
-                rightClickDelayTimer = 10;
+                backhand$breakBlockTimer = 5;
+                backhand$suppressNextOffhandBreakSwing = true;
                 thePlayer.swingItem();
-                playerController.attackEntity(thePlayer, objectMouseOver.entityHit);
+                playerController.clickBlock(x, y, z, objectMouseOver.sideHit);
             });
             return;
         }
 
-        if (BackhandConfig.OffhandBreakBlocks && blockHit
-            && offhandItem != null
-            && BackhandUtils.isItemTool(offhandItem.getItem())) {
+        if (BackhandConfig.OffhandAttack
+            && backhand$canUseOffhand(mainHandItem, offhandItem)
+            && (entityHit || backhand$shouldSwingOffhandUseFallback(offhandItem))) {
             BackhandUtils.useOffhandItem(thePlayer, () -> {
-                backhand$breakBlockTimer = 5;
-                playerController.clickBlock(x, y, z, objectMouseOver.sideHit);
+                thePlayer.swingItem();
+                if (entityHit) {
+                    playerController.attackEntity(thePlayer, objectMouseOver.entityHit);
+                }
             });
         }
     }
@@ -178,6 +187,11 @@ public abstract class MixinMinecraft {
             target = "Lnet/minecraft/client/multiplayer/PlayerControllerMP;resetBlockRemoving()V"))
     private boolean backhand$pauseReset(PlayerControllerMP instance) {
         if (backhand$breakBlockTimer > 0) {
+            if (!gameSettings.keyBindUseItem.getIsKeyPressed()) {
+                backhand$breakBlockTimer = 0;
+                backhand$suppressNextOffhandBreakSwing = false;
+                return true;
+            }
             backhand$breakBlockTimer--;
             return false;
         }
@@ -187,6 +201,11 @@ public abstract class MixinMinecraft {
     @Inject(method = "func_147115_a", at = @At(value = "HEAD"))
     private void backhand$breakBlockOffhand(boolean leftClick, CallbackInfo ci) {
         if (backhand$breakBlockTimer > 0) {
+            if (!gameSettings.keyBindUseItem.getIsKeyPressed()) {
+                backhand$breakBlockTimer = 0;
+                backhand$suppressNextOffhandBreakSwing = false;
+                return;
+            }
             BackhandUtils.useOffhandItem(thePlayer, () -> {
                 int i = objectMouseOver.blockX;
                 int j = objectMouseOver.blockY;
@@ -198,7 +217,13 @@ public abstract class MixinMinecraft {
 
                     if (thePlayer.isCurrentToolAdventureModeExempt(i, j, k)) {
                         effectRenderer.addBlockHitEffects(i, j, k, objectMouseOver);
-                        thePlayer.swingItem();
+                        if (backhand$suppressNextOffhandBreakSwing) {
+                            backhand$suppressNextOffhandBreakSwing = false;
+                        } else {
+                            thePlayer.swingItem();
+                        }
+                    } else {
+                        backhand$suppressNextOffhandBreakSwing = false;
                     }
                 }
             });
@@ -208,6 +233,22 @@ public abstract class MixinMinecraft {
     @ModifyExpressionValue(method = "func_147112_ai", at = @At(value = "INVOKE", target = "Ljava/util/List;size()I"))
     private int backhand$adjustSlotOffset(int original) {
         return original - 1;
+    }
+
+    @Unique
+    private boolean backhand$canUseOffhand(ItemStack mainHandItem, ItemStack offhandItem) {
+        return offhandItem != null || mainHandItem == null && BackhandConfig.EmptyOffhand;
+    }
+
+    @Unique
+    private boolean backhand$canBreakWithOffhand(ItemStack mainHandItem, ItemStack offhandItem) {
+        return offhandItem != null ? BackhandUtils.isItemTool(offhandItem.getItem())
+            : mainHandItem == null && BackhandConfig.EmptyOffhand;
+    }
+
+    @Unique
+    private boolean backhand$shouldSwingOffhandUseFallback(ItemStack offhandItem) {
+        return offhandItem == null || BackhandUtils.isItemTool(offhandItem.getItem());
     }
 
     @Unique

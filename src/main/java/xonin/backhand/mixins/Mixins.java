@@ -31,6 +31,7 @@ public enum Mixins implements IMixins {
             "minecraft.MixinModelBiped",
             "minecraft.MixinNetHandlerPlayClient",
             "minecraft.MixinMinecraft",
+            "minecraft.MixinGuiContainer",
             "minecraft.MixinGuiInventory",
             "minecraft.MixinEntityRenderer",
             "minecraft.MixinGuiContainerCreative",
