@@ -193,12 +193,16 @@ public abstract class MixinEntityPlayer extends EntityLivingBase implements IBac
             target = "Lnet/minecraft/entity/Entity;attackEntityFrom(Lnet/minecraft/util/DamageSource;F)Z"))
     private boolean backhand$adjustDualWieldAttackIFrames(Entity targetEntity, DamageSource source, float amount,
         Operation<Boolean> original) {
+        if (!BackhandConfig.OffhandAttack) {
+            return original.call(targetEntity, source, amount);
+        }
+
         EntityPlayer player = (EntityPlayer) (Object) this;
         boolean usingOffhand = BackhandUtils.isUsingOffhand(player);
         boolean dualWieldCombo = backhand$isDualWieldCombo(targetEntity, usingOffhand);
 
         if (dualWieldCombo) {
-            backhand$clampTargetIFrames(targetEntity);
+            backhand$capTargetIFrames((EntityLivingBase) targetEntity);
         }
 
         boolean result = original.call(targetEntity, source, amount);
@@ -208,7 +212,7 @@ public abstract class MixinEntityPlayer extends EntityLivingBase implements IBac
             backhand$lastAttackWasOffhand = usingOffhand;
 
             if (dualWieldCombo) {
-                backhand$clampTargetIFrames(targetEntity);
+                backhand$capTargetIFrames((EntityLivingBase) targetEntity);
             }
         }
         return result;
@@ -227,20 +231,31 @@ public abstract class MixinEntityPlayer extends EntityLivingBase implements IBac
 
     @Unique
     private boolean backhand$isDualWieldCombo(Entity targetEntity, boolean usingOffhand) {
-        return BackhandConfig.DualWieldAttackIFrames < 20
-            && targetEntity instanceof EntityLivingBase
-            && !(targetEntity instanceof EntityPlayer)
-            && targetEntity.getEntityId() == backhand$lastAttackTargetId
-            && usingOffhand != backhand$lastAttackWasOffhand
-            && ticksExisted - backhand$lastAttackTick <= ((EntityLivingBase) targetEntity).maxHurtResistantTime;
+        if (!(targetEntity instanceof EntityLivingBase target)) return false;
+        int dualWieldIFrames = backhand$getDualWieldAttackIFrames();
+        if (dualWieldIFrames >= 20
+            || targetEntity.getEntityId() != backhand$lastAttackTargetId
+            || usingOffhand == backhand$lastAttackWasOffhand) {
+            return false;
+        }
+
+        int ticksSinceLastAttack = ticksExisted - backhand$lastAttackTick;
+        return ticksSinceLastAttack >= 0 && ticksSinceLastAttack <= target.maxHurtResistantTime;
     }
 
     @Unique
-    private void backhand$clampTargetIFrames(Entity targetEntity) {
-        if (!(targetEntity instanceof EntityLivingBase target)) return;
-        int comboIFrames = Math.max(0, BackhandConfig.DualWieldAttackIFrames);
-        if (target.hurtResistantTime > comboIFrames) {
-            target.hurtResistantTime = comboIFrames;
+    private int backhand$getDualWieldAttackIFrames() {
+        int dualWieldIFrames = BackhandConfig.DualWieldAttackIFrames;
+        if (dualWieldIFrames < 0) return 0;
+        if (dualWieldIFrames > 20) return 20;
+        return dualWieldIFrames;
+    }
+
+    @Unique
+    private void backhand$capTargetIFrames(EntityLivingBase target) {
+        int dualWieldIFrames = backhand$getDualWieldAttackIFrames();
+        if (target.hurtResistantTime > dualWieldIFrames) {
+            target.hurtResistantTime = dualWieldIFrames;
         }
     }
 
