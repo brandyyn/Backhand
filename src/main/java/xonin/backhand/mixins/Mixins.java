@@ -13,6 +13,7 @@ public enum Mixins implements IMixins {
             "minecraft.MixinEntityPlayer",
             "minecraft.MixinNetHandlerPlayServer",
             "minecraft.MixinItemBow",
+            "minecraft.MixinItem",
             "minecraft.MixinEntityFishHook",
             "minecraft.MixinInventoryPlayer",
             "minecraft.MixinContainerPlayer",
