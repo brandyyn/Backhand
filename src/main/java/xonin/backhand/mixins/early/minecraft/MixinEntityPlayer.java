@@ -233,8 +233,7 @@ public abstract class MixinEntityPlayer extends EntityLivingBase implements IBac
     private boolean backhand$isDualWieldCombo(Entity targetEntity, boolean usingOffhand) {
         if (!(targetEntity instanceof EntityLivingBase target)) return false;
         int dualWieldIFrames = backhand$getDualWieldAttackIFrames();
-        if (dualWieldIFrames >= 20
-            || targetEntity.getEntityId() != backhand$lastAttackTargetId
+        if (dualWieldIFrames >= 20 || targetEntity.getEntityId() != backhand$lastAttackTargetId
             || usingOffhand == backhand$lastAttackWasOffhand) {
             return false;
         }

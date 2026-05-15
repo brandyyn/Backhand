@@ -33,7 +33,8 @@ public abstract class MixinItemRenderer {
         if (BackhandConfigClient.RenderEmptyOffhandAtRest) return original;
         EntityClientPlayerMP player = Minecraft.getMinecraft().thePlayer;
         if (BackhandUtils.isUsingOffhand(player)) {
-            return original || ((IBackhandPlayer) player).getOffSwingProgress(BackhandRenderHelper.firstPersonFrame) == 0;
+            return original
+                || ((IBackhandPlayer) player).getOffSwingProgress(BackhandRenderHelper.firstPersonFrame) == 0;
         }
         return original;
     }

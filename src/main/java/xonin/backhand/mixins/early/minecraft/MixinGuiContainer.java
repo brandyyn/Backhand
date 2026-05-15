@@ -26,8 +26,7 @@ public abstract class MixinGuiContainer extends GuiScreen {
 
     @Inject(method = "keyTyped", at = @At("HEAD"), cancellable = true)
     private void backhand$swapHoveredStackToOffhand(char typedChar, int keyCode, CallbackInfo ci) {
-        if (keyCode != CommonProxy.SWAP_KEY.getKeyCode()
-            || mc.thePlayer.inventory.getItemStack() != null
+        if (keyCode != CommonProxy.SWAP_KEY.getKeyCode() || mc.thePlayer.inventory.getItemStack() != null
             || theSlot == null
             || (!theSlot.getHasStack() && BackhandUtils.getOffhandItem(mc.thePlayer) == null)) {
             return;

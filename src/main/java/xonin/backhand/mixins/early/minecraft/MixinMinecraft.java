@@ -174,8 +174,7 @@ public abstract class MixinMinecraft {
             }
         }
 
-        if (!suppressOffhandFallback
-            && BackhandConfig.OffhandBreakBlocks
+        if (!suppressOffhandFallback && BackhandConfig.OffhandBreakBlocks
             && blockHit
             && backhand$canBreakWithOffhand(mainHandItem, offhandItem)) {
             BackhandUtils.useOffhandItem(thePlayer, () -> {
@@ -187,8 +186,7 @@ public abstract class MixinMinecraft {
             return;
         }
 
-        if (!suppressOffhandFallback
-            && BackhandConfig.OffhandAttack
+        if (!suppressOffhandFallback && BackhandConfig.OffhandAttack
             && backhand$canUseOffhand(mainHandItem, offhandItem)
             && (entityHit || backhand$shouldSwingOffhandUseFallback(offhandItem))) {
             BackhandUtils.useOffhandItem(thePlayer, () -> {
